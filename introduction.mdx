@@ -1,0 +1,40 @@
+---
+title: Introduction
+description: 'Runtime behavior patches for production services'
+---
+
+# LiveOps
+
+**Change production behavior without redeploying.**
+
+Record traffic, simulate a scoped behavior patch, deploy it with canary controls, and roll back quickly when feature flags aren't enough.
+
+## The Problem
+
+When a downstream service degrades during an incident:
+
+| Option | Limitation |
+|--------|------------|
+| **Redeploy** | Too slow (30+ minutes) |
+| **Feature flags** | Only toggle pre-compiled code paths |
+| **Service mesh** | Can retry/timeout, can't synthesize responses |
+
+None of these let you inject *new behavior* at runtime.
+
+## The Solution
+
+LiveOps separates **when** to intervene from **what** to do.
+
+Deploy a behavior patch after replaying it against recorded request context. No redeploy. No pre-compiled variants.
+
+## Key Properties
+
+- **Safe by default** — Executes in under 10ms with hard timeout
+- **Simulate before deploy** — Rehearse policies against recorded request context
+- **Pure evaluation** — Deterministic and testable
+- **Blast radius controls** — Canary %, tenant targeting
+- **Incrementally adoptable** — Go middleware, CLI, and standalone core library
+
+<Card title="Request Early Access" icon="rocket" href="https://calendly.com/saditya9211/30min">
+  20-minute demo. No sales pitch.
+</Card>

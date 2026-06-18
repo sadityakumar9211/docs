@@ -1,0 +1,261 @@
+---
+title: FAQ
+description: 'Common questions about LiveOps'
+---
+
+<AccordionGroup>
+
+<Accordion title="How much integration is required?">
+
+**One-time setup at decision points. No code changes after that.**
+
+**Level 1: Hook Points (One-Time)**
+
+You wrap your existing code at decision points:
+
+```go
+// Before
+func handlePayment(req PaymentRequest) Response {
+    result := paymentService.Process(req)
+    return result
+}
+
+// After (with LiveOps)
+func handlePayment(req PaymentRequest) Response {
+    ctx := liveops.BuildContext(req)
+    decision := liveops.Evaluate(ctx, "http.request")
+
+    if decision.ShouldBlock() {
+        return decision.BlockResponse()
+    }
+    if decision.HasFallback() {
+        return decision.Fallback()
+    }
+
+    result := paymentService.Process(req)
+    return result
+}
+```
+
+This is the **only code change**. You add it once per hook point.
+
+**Level 2: Policy Changes (Zero Code)**
+
+| Scenario                 | Without LiveOps                    | With LiveOps                    |
+|--------------------------|------------------------------------|---------------------------------|
+| Block a tenant           | Code change, PR, Review, Deploy    | Update policy JSON, Hot reload  |
+| Add timeout override     | Code change, Deploy                | Update policy JSON              |
+| Return fallback response | Code change, Deploy                | Update policy JSON              |
+| Change retry count       | Code change, Deploy                | Update policy JSON              |
+| Rollback bad change      | Rollback deploy                    | Revert policy JSON              |
+
+Once hooks are in place, runtime changes require **no code changes**.
+
+</Accordion>
+
+<Accordion title="What's the difference from feature flags?">
+
+**Feature flags toggle pre-coded variants. LiveOps injects new behavior.**
+
+**Feature Flags (LaunchDarkly, etc.)**
+
+```go
+// You must pre-code ALL variants
+if featureFlag.isEnabled("use-new-timeout") {
+    timeout = 500  // Hardcoded!
+} else {
+    timeout = 1000  // Hardcoded!
+}
+```
+
+Limited to what you anticipated and coded.
+
+**LiveOps**
+
+```go
+// Value comes from policy at runtime
+decision := liveops.Evaluate(ctx, "call.before")
+timeout := decision.TimeoutOverride()  // ANY value
+```
+
+Not limited to pre-coded variants.
+
+</Accordion>
+
+<Accordion title="What are Invariants vs Dynamic Values?">
+
+This is the core architectural insight behind LiveOps.
+
+**Invariants (Your Code)**
+
+Structure, flow, and contracts that **don't change** during incidents:
+
+- Request validation logic
+- Database schema and queries
+- API contracts (input/output shapes)
+- Business rules
+- Integration points (which services exist)
+
+**Dynamic Values (Policy)**
+
+Operational parameters that **might need to change** at runtime:
+
+- Which requests to allow/block?
+- What timeout for this dependency?
+- What to return when dependency fails?
+- Who gets the new behavior?
+- How many retries?
+
+**The Problem**
+
+Most code mixes invariants and dynamic values. When "dynamic" parts need to change, you change code. That's a deploy. That's risk.
+
+**The Solution**
+
+Separate invariants (code) from dynamic values (policy):
+
+|          | Invariants           | Dynamic                    |
+|----------|----------------------|----------------------------|
+| Changes  | Monthly              | Hourly / Per-incident      |
+| Risk     | High (deploy)        | Low (policy reload)        |
+| Rollback | Redeploy             | Revert JSON                |
+| Owner    | Engineers            | Engineers + SRE + On-call  |
+
+</Accordion>
+
+<Accordion title="Is it safe for production?">
+
+Yes. LiveOps is designed with production safety as the primary constraint:
+
+- **Fail-open**: Errors in patch evaluation allow requests through
+- **Hard timeout**: Evaluation terminates in under 10ms regardless of policy complexity
+- **Pure evaluation**: Engine returns decisions, never performs I/O
+- **Deterministic**: Same input always produces same output
+- **Blast radius controls**: Canary %, tenant targeting, region filtering
+
+**Test before you deploy:**
+
+- **Traffic capture**: Record live production traffic for simulation
+- **Policy simulation**: Replay captured traffic against new policies to see exactly what would change
+- **Diff reports**: See which requests would be blocked, modified, or passed through before deploying
+- **Canary rollouts**: Start with 1% of traffic, validate metrics, then gradually increase
+
+You know exactly what a policy will do before it touches production.
+
+</Accordion>
+
+<Accordion title="How do I promote a policy to production code?">
+
+LiveOps policies are meant to be **temporary runtime patches**, not permanent infrastructure. Here's the lifecycle:
+
+**Step 1: Incident Response**
+
+Deploy a policy to mitigate the issue immediately (seconds).
+
+**Step 2: Stabilization**
+
+Policy runs in production. You validate it's working. Days or weeks pass.
+
+**Step 3: Code Promotion**
+
+Write the equivalent logic in your codebase. Deploy with the policy **still active** as a safety net.
+
+**Step 4: Disable Policy**
+
+Once the code is verified, disable the policy:
+
+```bash
+liveops disable payment-fallback
+# or set canary_percent: 0
+```
+
+Takes effect in seconds.
+
+**Step 5: Code Bug? Instant Rollback**
+
+If your new code has issues, re-enable the policy immediately:
+
+```bash
+liveops enable payment-fallback
+```
+
+You're back to the known-good behavior in seconds while you fix the code.
+
+| Phase | Who handles the behavior |
+|-------|-------------------------|
+| Incident | LiveOps policy (instant) |
+| Stabilization | LiveOps policy (validated) |
+| Code deployment | Both (policy as fallback) |
+| Post-verification | Code only (policy disabled) |
+| Code bug discovered | Re-enable policy instantly |
+
+**Key insight**: LiveOps acts as a safety net during code transitions, not a replacement for code.
+
+</Accordion>
+
+<Accordion title="Why WASM? Why not just config / CEL / OPA / Rego?">
+
+Config and policy languages (CEL, OPA/Rego, flags) are designed to decide **when** something applies:
+
+- allow / deny
+- routing
+- targeting
+- percentage rollouts
+
+They intentionally avoid executing **new behavior**.
+
+During incidents, you often need to introduce behavior that did **not** exist in the binary:
+
+- construct a degraded fallback response
+- change retry / timeout algorithms
+- apply temporary business logic to stabilize a dependency
+
+That requires executing code.
+
+WASM is used because it is the **safest way to execute late-bound code inside a running service**:
+
+- strict sandboxing (no network, filesystem, or syscalls by default)
+- bounded CPU and memory
+- deterministic execution
+- language-agnostic authoring (Rust today)
+
+CEL/OPA still play a role:
+
+- they decide *when* a patch applies and its blast radius
+- WASM defines *what behavior* executes when it does
+
+**Config selects. WASM acts.**
+
+</Accordion>
+
+<Accordion title="If we still write code and compile it, how is this better than deploying?">
+
+This system does not try to make coding faster. It reduces **time-to-safe mitigation** by skipping the deployment pipeline.
+
+A normal deploy requires:
+
+- touching the main codebase
+- CI, builds, approvals
+- rolling restarts
+- coarse-grained rollout and rollback
+
+Even small changes often take **60–120 minutes** end-to-end.
+
+A WASM patch:
+
+- is compiled in seconds
+- can be simulated on recorded production traffic
+- can be applied to a 1–5% canary or specific tenants immediately
+- can be rolled back instantly without redeploy
+
+This typically reduces mitigation time to **20–30 minutes** during an incident.
+
+This is not a replacement for deployments. Patches are **temporary stabilization tools** used while the permanent fix is being deployed.
+
+</Accordion>
+
+</AccordionGroup>
+
+<Card title="See It In Action" icon="rocket" href="https://calendly.com/saditya9211/30min">
+  20-minute demo. No sales pitch.
+</Card>

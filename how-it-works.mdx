@@ -1,0 +1,51 @@
+---
+title: How It Works
+description: 'High-level architecture overview'
+---
+
+## Architecture
+
+LiveOps separates **when** to intervene from **what** to do:
+
+```mermaid
+flowchart TD
+    A[Incoming Request] --> B{Condition Check}
+    B -->|"error_rate > 0.5 AND path = /pay"| C{Match?}
+    C -->|Yes| D[Apply Effect]
+    C -->|No| E[Pass Through]
+    D --> F[Return fallback response]
+    D --> G[Modify timeout]
+    D --> H[Add observability tags]
+    E --> I[Normal Processing]
+
+    style A fill:#22c55e,stroke:#16a34a,color:#0a0a0a
+    style B fill:#1e293b,stroke:#334155,color:#f8fafc
+    style C fill:#1e293b,stroke:#334155,color:#f8fafc
+    style D fill:#22c55e,stroke:#16a34a,color:#0a0a0a
+    style E fill:#334155,stroke:#475569,color:#f8fafc
+    style F fill:#0f172a,stroke:#22c55e,color:#f8fafc
+    style G fill:#0f172a,stroke:#22c55e,color:#f8fafc
+    style H fill:#0f172a,stroke:#22c55e,color:#f8fafc
+    style I fill:#334155,stroke:#475569,color:#f8fafc
+```
+
+## Core Principles
+
+**Pure evaluation** — The engine returns decisions, never performs I/O. Your middleware executes the effects.
+
+**Fail-open** — Errors in patch evaluation allow the request through. Never blocks production traffic due to policy bugs.
+
+**Deterministic** — Same input always produces same output. Fully testable before deployment.
+
+## Integration Points
+
+LiveOps embeds as a library with hooks at key points:
+
+- HTTP request/response
+- gRPC unary/streaming
+- Downstream service calls
+- Custom domain-specific hooks
+
+<Card title="Request Early Access" icon="rocket" href="https://calendly.com/saditya9211/30min">
+  See a live demo of the architecture in action.
+</Card>

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "LiveOps",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#22c55e",
+    "light": "#4ade80",
+    "dark": "#16a34a"
+  },
+  "topbarLinks": [
+    {
+      "name": "Home",
+      "url": "https://liveops.adityas.net"
+    },
+    {
+      "name": "Request Demo",
+      "url": "https://calendly.com/saditya9211/30min"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Request Access",
+    "url": "https://calendly.com/saditya9211/30min"
+  },
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://docs.liveops.adityas.net/github"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Overview",
+      "pages": [
+        "introduction",
+        "how-it-works",
+        "faq",
+        "roadmap"
+      ]
+    },
+    {
+      "group": "Resources",
+      "pages": [
+        "github"
+      ]
+    }
+  ],
+  "footerSocials": {},
+  "modeToggle": {
+    "default": "dark"
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/introduction"
+    }
+  ]
+}
